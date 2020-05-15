@@ -7,16 +7,20 @@ function alertFollowing(data) {
     text: `Hello ${userDisplayName}, thank you for the follow!`,
   });
 
-  const alertFollowing = $('#alert-following');
+  const appEl = $('#app');
+
   $('#alert-following .display-name').innerText = userDisplayName;
 
-  alertFollowing.classList.add('show');
+  appEl.classList.add('show');
+  resetAnimation();
   startAnimation();
 
   setTimeout(() => {
-    stopAnimation();
-    alertFollowing.classList.remove('show');
-    alertFollowing.classList.add('hide');
+    setTimeout(() => {
+      stopAnimation();
+    }, 2000);
+    appEl.classList.remove('show');
+    appEl.classList.add('hide');
   }, 5000);
 }
 
@@ -24,24 +28,6 @@ async function init() {
   nodecg.listenFor('follow', 'twitch-alerts', (data) => {
     alertFollowing(data);
   });
-
-  setInterval(() => {
-    if (!isRunning) return;
-
-    const canvas = document.getElementById('canvas');
-    const particle = createParticle({
-      x: -32,
-      y: Math.random() * canvas.height,
-      dx: 200 + Math.random() * 200,
-      dy: 0,
-      ttl: 10,
-      size: 32,
-      color: randomColor(),
-      dcolor: { r: 2 - rnd(4), g: 2 - rnd(4), b: 2 - rnd(4) },
-    });
-    particles.push(particle);
-  }, 100);
-
   setTimeout(update, UPDATE_PERIOD);
   window.requestAnimationFrame(draw);
 }
@@ -56,9 +42,40 @@ const UPDATE_PERIOD = 1000 / 60;
 let isRunning = false;
 let particles = [];
 
-const startAnimation = () => isRunning = true;
+let createParticleInterval = null;
 
-const stopAnimation = () => isRunning = false;
+const resetAnimation = () => (particles = []);
+
+const DCOLOR_RANGE = 512;
+const dcolorRnd = () => DCOLOR_RANGE - rnd(DCOLOR_RANGE * 2);
+
+const startAnimation = () => {
+  isRunning = true;
+  if (createParticleInterval) {
+    clearInterval(createParticleInterval);
+  }
+  createParticleInterval = setInterval(() => {
+    const canvas = document.getElementById('canvas');
+    const particle = createParticle({
+      x: -32,
+      y: Math.random() * canvas.height,
+      dx: 250 + Math.random() * 250,
+      dy: 0,
+      ttl: 10,
+      size: 48,
+      color: randomColor(),
+      dcolor: { r: dcolorRnd(), g: dcolorRnd(), b: dcolorRnd() },
+    });
+    particles.push(particle);
+  }, 150);
+};
+
+const stopAnimation = () => {
+  isRunning = false;
+  if (createParticleInterval) {
+    clearInterval(createParticleInterval);
+  }
+};
 
 let lastUpdate = Date.now();
 function update() {
@@ -84,13 +101,13 @@ function draw() {
   canvas.width = cw;
   canvas.height = ch;
 
-  ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   ctx.fillRect(0, 0, cw, ch);
 
   if (isRunning) {
     for (const particle of particles) {
       drawParticle(particle, ctx);
-    }  
+    }
   }
 
   window.requestAnimationFrame(draw);
@@ -109,7 +126,7 @@ function updateParticle(particle, dt) {
   // Hacky color cycling
   for (const name of ['r', 'g', 'b']) {
     particle.color[name] =
-      (particle.color[name] + (particle.dcolor[name] * dt)) % 255;
+      ((particle.color[name] + particle.dcolor[name] * dt) % 255);
   }
 
   particle.ttl -= dt;
@@ -139,13 +156,16 @@ function drawParticle(particle, ctx) {
 
   ctx.save();
 
-  ctx.strokeStyle = `rgba(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)}, ${a})`;
-  //console.log(ctx.strokeStyle);
-  ctx.lineWidth = 2;
+  const rgba = `rgba(${Math.floor(r)},${Math.floor(g)},${Math.floor(b)},${a})`;
+
+  ctx.lineWidth = 3;
+
   ctx.translate(x, y);
   ctx.rotate(rotation);
   ctx.scale(size / 100, size / 100);
 
+  ctx.strokeStyle = rgba;
+  ctx.beginPath();
   ctx.moveTo(0, -50);
   ctx.lineTo(-45, 50);
   ctx.lineTo(-12.5, 12.5);
