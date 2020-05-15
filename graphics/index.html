@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link href="index.css" type="text/css" rel="stylesheet" />
+    <script type="module" src="index.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <canvas id="canvas">Canvas is not supported in your browser.</canvas>
+    </div>
+
+    <div id="alert-following">
+      <p class="following-message">
+        <span class="display-name">FOLLOWER NAME</span>
+        is now following you!
+      </p>
+    </div>
+
+    <script type="module">
+      import(
+        '/bundles/file-watcher/public/file-watcher.mjs'
+      ).then(({ default: reloadOnFileChange }) => reloadOnFileChange(nodecg));
+    </script>
+  </body>
+</html>

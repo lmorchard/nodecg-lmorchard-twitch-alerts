@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      .monospace {
+        font-family: monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Test fire alerts:</p>
+    <form id="alertsForm">
+      <input
+        type="text"
+        id="followUserDisplayName"
+        style="width: 50%;"
+        placeholder="Display name"
+        value="J Random Hacker"
+      />
+      <button id="follow">Follow</button>
+    </form>
+
+    <script type="module">
+      import(
+        '/bundles/file-watcher/public/file-watcher.mjs'
+      ).then(({ default: reload }) => reload(nodecg));
+
+      const $ = (sel) => document.querySelector(sel);
+      $('#alertsForm').addEventListener('submit', (ev) => ev.preventDefault());
+      $('#follow').addEventListener('click', (ev) => {
+        const userDisplayName = $('#followUserDisplayName').value;
+        nodecg.sendMessageToBundle('follow', 'twitch-alerts', {
+          userId: 'randomhacker',
+          userDisplayName,
+        });
+      });
+    </script>
+  </body>
+</html>
