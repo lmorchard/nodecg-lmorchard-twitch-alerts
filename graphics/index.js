@@ -1,7 +1,7 @@
 const $ = (...args) => document.body.querySelector(...args);
 
 async function init() {
-  nodecg.listenFor('twitch.following', 'twitch-connect', data => {
+  nodecg.listenFor('twitch.following', 'twitch-connect', (data) => {
     alertFollowing(data);
   });
   setTimeout(update, UPDATE_PERIOD);
@@ -32,10 +32,10 @@ function alertFollowing(data) {
   }, 5000);
 }
 
-const color = ({ r, g, b, a = 1.0 }) => ({ r, g, b, a });
-const rnd = (max) => Math.floor(Math.random() * max);
+const color = ({ h, s, l, a = 1.0 }) => ({ h, s, l, a });
+const rnd = (max) => (Math.random() * max);
 const randomColor = () =>
-  color({ r: rnd(255), g: rnd(255), b: rnd(255), a: 1.0 });
+  color({ h: rnd(1), s: 0.75, l: 0.5, a: 1.0 });
 
 const UPDATE_PERIOD = 1000 / 60;
 
@@ -59,15 +59,15 @@ const startAnimation = () => {
     const particle = createParticle({
       x: -32,
       y: Math.random() * canvas.height,
-      dx: 250 + Math.random() * 250,
+      dx: 500 + Math.random() * 500,
       dy: 0,
       ttl: 10,
       size: 48,
       color: randomColor(),
-      dcolor: { r: dcolorRnd(), g: dcolorRnd(), b: dcolorRnd() },
+      dcolor: { h: rnd(1.0), s: 0, l: 0, a: 0 },
     });
     particles.push(particle);
-  }, 150);
+  }, 100);
 };
 
 const stopAnimation = () => {
@@ -113,6 +113,42 @@ function draw() {
   window.requestAnimationFrame(draw);
 }
 
+/**
+ * Converts an HSL color value to RGB. Conversion formula
+ * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
+ * Assumes h, s, and l are contained in the set [0, 1] and
+ * returns r, g, and b in the set [0, 255].
+ *
+ * @param   Number  h       The hue
+ * @param   Number  s       The saturation
+ * @param   Number  l       The lightness
+ * @return  Array           The RGB representation
+ */
+function hslToRgb(h, s, l) {
+  var r, g, b;
+
+  if (s == 0) {
+    r = g = b = l; // achromatic
+  } else {
+    function hue2rgb(p, q, t) {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    }
+
+    var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    var p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+
+  return [r * 255, g * 255, b * 255];
+}
+
 function updateParticle(particle, dt) {
   const canvas = document.getElementById('canvas');
 
@@ -123,10 +159,8 @@ function updateParticle(particle, dt) {
     particle.alive = false;
   }
 
-  // Hacky color cycling
-  for (const name of ['r', 'g', 'b']) {
-    particle.color[name] =
-      ((particle.color[name] + particle.dcolor[name] * dt) % 255);
+  for (const name of Object.keys(particle.color)) {
+    particle.color[name] = (particle.color[name] + particle.dcolor[name] * dt) % 1.0;
   }
 
   particle.ttl -= dt;
@@ -152,11 +186,13 @@ function createParticle({ x, y, dx, dy, ttl, color, ...rest }) {
 
 function drawParticle(particle, ctx) {
   const { x, y, color, rotation, size } = particle;
-  const { r, g, b, a } = color;
+  const { h, s, l, a } = color;
 
   ctx.save();
 
-  const rgba = `rgba(${Math.floor(r)},${Math.floor(g)},${Math.floor(b)},${a})`;
+  const [r, g, b] = hslToRgb(h, s, l);
+
+  const rgba = `rgba(${r},${g},${b},1.0)`;
 
   ctx.lineWidth = 3;
 
