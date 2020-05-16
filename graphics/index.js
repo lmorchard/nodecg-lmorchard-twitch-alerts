@@ -1,15 +1,23 @@
 const $ = (...args) => document.body.querySelector(...args);
 
+async function init() {
+  nodecg.listenFor('twitch.following', 'twitch-connect', data => {
+    alertFollowing(data);
+  });
+  setTimeout(update, UPDATE_PERIOD);
+  window.requestAnimationFrame(draw);
+}
+
 function alertFollowing(data) {
-  const { userId, userDisplayName } = data;
+  const { from_name } = data;
 
   nodecg.sendMessageToBundle('say', 'sam-say', {
-    text: `Hello ${userDisplayName}, thank you for the follow!`,
+    text: `Hello ${from_name}, thank you for the follow!`,
   });
 
   const appEl = $('#app');
 
-  $('#alert-following .display-name').innerText = userDisplayName;
+  $('#alert-following .display-name').innerText = from_name;
 
   appEl.classList.add('show');
   resetAnimation();
@@ -22,14 +30,6 @@ function alertFollowing(data) {
     appEl.classList.remove('show');
     appEl.classList.add('hide');
   }, 5000);
-}
-
-async function init() {
-  nodecg.listenFor('follow', 'twitch-alerts', (data) => {
-    alertFollowing(data);
-  });
-  setTimeout(update, UPDATE_PERIOD);
-  window.requestAnimationFrame(draw);
 }
 
 const color = ({ r, g, b, a = 1.0 }) => ({ r, g, b, a });

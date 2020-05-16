@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="module" src="fireworks.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <canvas id="canvas">Canvas is not supported in your browser.</canvas>
+    </div>
+    <script type="module">
+      import(
+        '/bundles/file-watcher/public/file-watcher.mjs'
+      ).then(({ default: reloadOnFileChange }) => reloadOnFileChange(nodecg));
+    </script>
+  </body>
+</html>

@@ -35,6 +35,11 @@
     ],
     "graphics": [
       {
+        "file": "fireworks.html",
+        "width": 1280,
+        "height": 720
+      },
+      {
         "file": "index.html",
         "width": 1280,
         "height": 720

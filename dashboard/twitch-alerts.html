@@ -22,19 +22,20 @@
     </form>
 
     <script type="module">
-      import(
-        '/bundles/file-watcher/public/file-watcher.mjs'
-      ).then(({ default: reload }) => reload(nodecg));
-
       const $ = (sel) => document.querySelector(sel);
       $('#alertsForm').addEventListener('submit', (ev) => ev.preventDefault());
       $('#follow').addEventListener('click', (ev) => {
-        const userDisplayName = $('#followUserDisplayName').value;
-        nodecg.sendMessageToBundle('follow', 'twitch-alerts', {
-          userId: 'randomhacker',
-          userDisplayName,
+        const from_name = $('#followUserDisplayName').value;
+        nodecg.sendMessageToBundle('twitch.following', 'twitch-connect', {
+          from_name,
         });
       });
+    </script>
+
+    <script type="module">
+      import(
+        '/bundles/file-watcher/public/file-watcher.mjs'
+      ).then(({ default: reload }) => reload(nodecg));
     </script>
   </body>
 </html>
