@@ -1,21 +1,19 @@
+const UPDATE_PERIOD = 1000 / 60;
+
 const $ = (...args) => document.body.querySelector(...args);
 const appEl = $('#app');
 
 let isRunning = false;
 let particleSystems = [];
 
-const UPDATE_PERIOD = 1000 / 60;
-
 async function init() {
   reset();
   update();
   draw();
 
-  alertFollowing({ from_name: 'ExampleUser' });
+  // alertFollowing({ from_name: 'ExampleUser' });
 
-  nodecg.listenFor('twitch.following', 'twitch-connect', (data) => {
-    alertFollowing(data);
-  });
+  nodecg.listenFor('twitch.following', 'twitch-connect', alertFollowing);
 }
 
 async function alertFollowing(data) {
@@ -27,13 +25,16 @@ async function alertFollowing(data) {
 
   const appEl = $('#app');
 
-  $('#alert-following .display-name').innerText = from_name;
-
-  start([new ZoomyShips()]);
+  start([
+    //new ZoomyShips(),
+    new SineScroller({
+      message: `Greetz ${from_name}! Thanks for following! ... `,
+    }),
+  ]);
   await show();
-  //await wait(3000);
-  //await hide();
-  //stop();
+  await wait(10000);
+  await hide();
+  stop();
 }
 
 function show() {
@@ -136,9 +137,106 @@ class ParticleSystem {
   drawParticle(particle, canvas) {}
 }
 
-class ZoomyShips extends ParticleSystem {
-  constructor({ ...opts } = {}) {
+class SineScroller extends ParticleSystem {
+  constructor(opts = {}) {
     super(opts);
+    Object.assign(this, {
+      message: 'Hello world',
+      speed: 250,
+      colorSpeed: 0.3,
+      size: 75,
+      waveWidth: 75,
+      waveHeight: 30,
+      ...opts,
+    });
+    this.color = { h: 0.0, s: 0.75, l: 0.5, a: 1.0 };
+    this.dcolor = { h: this.colorSpeed, s: 0, l: 0, a: 0 };
+    this.letters = this.message.split('');
+  }
+
+  update(canvas) {
+    const dt = super.update(canvas);
+
+    for (const name of Object.keys(this.color)) {
+      this.color[name] = (this.color[name] + this.dcolor[name] * dt) % 1.0;
+    }
+
+    if (
+      this.particles.length === 0 ||
+      this.particles[this.particles.length - 1].x < canvas.width
+    ) {
+      const letter = this.letters.shift();
+      if (letter) {
+        this.spawnParticle(canvas, letter);
+      }
+    }
+    window.particles = this.particles;
+  }
+
+  spawnParticle(canvas, letter) {
+    this.particles.push({
+      letter,
+      x: canvas.width + this.size * 0.66,
+      y: 0,
+      baseY: canvas.height / 2 - this.size / 2,
+      dx: 0 - this.speed,
+      ttl: 20,
+      size: this.size,
+      rotation: 90 * (Math.PI / 180),
+      alive: true,
+    });
+  }
+
+  updateParticle(particle, canvas, dt) {
+    particle.x += particle.dx * dt;
+    particle.y =
+      particle.baseY + Math.sin(particle.x / this.waveWidth) * this.waveHeight;
+
+    if (particle.x < 0 - particle.size) {
+      particle.alive = false;
+    }
+
+    particle.ttl -= dt;
+    if (particle.ttl < 0) {
+      particle.alive = false;
+    }
+  }
+
+  drawParticle(particle, canvas) {
+    const ctx = canvas.getContext('2d');
+    const { letter, x, y, rotation, size } = particle;
+    const { h, s, l, a } = this.color;
+
+    ctx.save();
+
+    const [r, g, b] = hslToRgb(h, s, l);
+
+    const rgba = `rgba(${r},${g},${b},1.0)`;
+
+    ctx.translate(x, y);
+    // ctx.rotate(rotation);
+    // ctx.scale(size / 100, size / 100);
+
+    ctx.fillStyle = rgba;
+    //ctx.fillRect(25, 25, 100, 100);
+    ctx.font = `${this.size}px monospace`;
+    ctx.fillText(letter, 0, 0);
+
+    ctx.restore();
+  }
+}
+
+class ZoomyShips extends ParticleSystem {
+  constructor(opts = {}) {
+    super(opts);
+    Object.assign(this, {
+      spawnDelay: 0.25,
+      size: 50,
+      lineWidth: 5,
+      minSpeed: 500,
+      speedVary: 1000,
+      ...opts,
+    });
     this.nextParticleDelay = 0;
   }
 
@@ -146,23 +244,21 @@ class ZoomyShips extends ParticleSystem {
     const dt = super.update(canvas);
     this.nextParticleDelay -= dt;
     if (this.nextParticleDelay <= 0) {
-      this.nextParticleDelay = 0.1;
+      this.nextParticleDelay = this.spawnDelay;
       this.spawnParticle(canvas);
     }
-    window.npd = this.nextParticleDelay;
   }
 
   spawnParticle(canvas) {
     this.particles.push({
-      x: -32,
+      x: this.size,
       y: Math.random() * canvas.height,
-      dx: 500 + Math.random() * 500,
+      dx: this.minSpeed + Math.random() * this.speedVary,
       dy: 0,
       ttl: 10,
-      size: 48,
+      size: this.size,
       color: { h: Math.random(), s: 0.75, l: 0.5, a: 1.0 },
       dcolor: { h: Math.random(), s: 0, l: 0, a: 0 },
-      size: 32,
       rotation: 90 * (Math.PI / 180),
       alive: true,
     });
@@ -172,7 +268,7 @@ class ZoomyShips extends ParticleSystem {
     particle.x += particle.dx * dt;
     particle.y += particle.dy * dt;
 
-    if (particle.x > canvas.width) {
+    if (particle.x > canvas.width + this.size) {
       particle.alive = false;
     }
 
@@ -198,7 +294,7 @@ class ZoomyShips extends ParticleSystem {
 
     const rgba = `rgba(${r},${g},${b},1.0)`;
 
-    ctx.lineWidth = 10;
+    ctx.lineWidth = this.lineWidth;
 
     ctx.translate(x, y);
     ctx.rotate(rotation);
