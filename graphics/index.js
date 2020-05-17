@@ -11,8 +11,6 @@ async function init() {
   update();
   draw();
 
-  // alertFollowing({ from_name: 'ExampleUser' });
-
   nodecg.listenFor('twitch.following', 'twitch-connect', alertFollowing);
 }
 
@@ -20,15 +18,19 @@ async function alertFollowing(data) {
   const { from_name } = data;
 
   nodecg.sendMessageToBundle('say', 'sam-say', {
-    text: `Hello ${from_name}, thank you for the follow!`,
+    text: `Greetz ${from_name}! Thanks for following!`,
   });
 
-  const appEl = $('#app');
-
   start([
-    //new ZoomyShips(),
+    new ZoomyShips(),
     new SineScroller({
-      message: `Greetz ${from_name}! Thanks for following! ... `,
+      y: 320,
+      speed: 325,
+      size: 75,
+      kerning: 0.9,
+      waveWidth: 100,
+      waveHeight: 40,
+      message: `Greetz ${from_name}! Thanks for following!`,
     }),
   ]);
   await show();
@@ -141,10 +143,12 @@ class SineScroller extends ParticleSystem {
   constructor(opts = {}) {
     super(opts);
     Object.assign(this, {
+      y: 320,
       message: 'Hello world',
       speed: 250,
       colorSpeed: 0.3,
       size: 75,
+      kerning: 0.75,
       waveWidth: 75,
       waveHeight: 30,
       ...opts,
@@ -176,9 +180,9 @@ class SineScroller extends ParticleSystem {
   spawnParticle(canvas, letter) {
     this.particles.push({
       letter,
-      x: canvas.width + this.size * 0.66,
+      x: canvas.width + this.size * this.kerning,
       y: 0,
-      baseY: canvas.height / 2 - this.size / 2,
+      baseY: this.y,
       dx: 0 - this.speed,
       ttl: 20,
       size: this.size,
@@ -217,9 +221,10 @@ class SineScroller extends ParticleSystem {
     // ctx.rotate(rotation);
     // ctx.scale(size / 100, size / 100);
 
+    ctx.font = `${this.size}px C64 User Mono`;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillText(letter, this.size * 0.125, this.size * 0.125);
     ctx.fillStyle = rgba;
-    //ctx.fillRect(25, 25, 100, 100);
-    ctx.font = `${this.size}px monospace`;
     ctx.fillText(letter, 0, 0);
 
     ctx.restore();

@@ -3,6 +3,29 @@ body {
   margin: 0;
   padding: 0;
 }
+@font-face {
+  /**
+   * http://style64.org/c64-truetype
+   * see license.txt in font directory for details.
+   */
+  font-family: 'C64 User Mono';
+  src: url('font/C64_User_Mono_v1.0-STYLE.eot');
+}
+
+@font-face {
+  /**
+   * http://style64.org/c64-truetype
+   * see license.txt in font directory for details.
+   */
+  font-family: 'C64 User Mono';
+  src: url('font/C64_User_Mono_v1.0-STYLE.ttf') format('truetype'),
+    url('font/C64_User_Mono_v1.0-STYLE.woff') format('woff');
+}
+
+.c64 {
+  /* generic "use this font" class */
+  font-family: 'C64 User Mono';
+}
 
 #app {
   opacity: 0;
