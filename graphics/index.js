@@ -17,12 +17,16 @@ async function init() {
 async function alertFollowing(data) {
   const { from_name } = data;
 
-  nodecg.sendMessageToBundle('say', 'sam-say', {
-    text: `Greetz ${from_name}! Thanks for following!`,
-  });
+  setTimeout(() => {
+    nodecg.sendMessageToBundle('say', 'sam-say', {
+      text: `Greetz ${from_name}! Thanks for the follow!`,
+    });  
+  }, 1000);
 
   start([
-    new ZoomyShips(),
+    new ZoomyShips({
+      lineWidth: 10,
+    }),
     new SineScroller({
       y: 320,
       speed: 325,
@@ -30,22 +34,31 @@ async function alertFollowing(data) {
       kerning: 0.9,
       waveWidth: 100,
       waveHeight: 40,
-      message: `Greetz ${from_name}! Thanks for following!`,
+      message: `Greetz ${from_name}!`,
+    }),
+    new SineScroller({
+      y: 500,
+      speed: 325,
+      size: 75,
+      kerning: 0.9,
+      waveWidth: 175,
+      waveHeight: 40,
+      message: `     Thanks for the follow!`,
     }),
   ]);
   await show();
-  await wait(10000);
+  await waitUntilFinished();
   await hide();
   stop();
 }
 
-function show() {
+async function show() {
   appEl.classList.add('show');
   appEl.classList.remove('hide');
   return wait(1000);
 }
 
-function hide() {
+async function hide() {
   appEl.classList.remove('show');
   appEl.classList.add('hide');
   return wait(1000);
@@ -58,10 +71,10 @@ function reset() {
 
 function start(newSystems = []) {
   isRunning = true;
+  particleSystems = newSystems;
   for (const system of particleSystems) {
     system.start();
   }
-  window.particles = particleSystems = newSystems;
 }
 
 function stop() {
@@ -71,38 +84,52 @@ function stop() {
   }
 }
 
+async function waitUntilFinished() {
+  await Promise.all(
+    particleSystems
+      .filter((system) => system.willEverFinish)
+      .map((system) => system.waitUntilFinished())
+  );
+}
+
 function update() {
-  const canvas = document.getElementById('canvas');
-  for (const system of particleSystems) {
-    system.update(canvas);
+  if (isRunning) {
+    const canvas = document.getElementById('canvas');
+    for (const system of particleSystems) {
+      system.update(canvas);
+    }
   }
   setTimeout(update, UPDATE_PERIOD);
 }
 
 function draw() {
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const cw = 1280; //canvas.parentElement.offsetWidth;
-  const ch = 720; //canvas.parentElement.offsetHeight;
-  canvas.width = cw;
-  canvas.height = ch;
+  if (isRunning) {
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const cw = 1280; //canvas.parentElement.offsetWidth;
+    const ch = 720; //canvas.parentElement.offsetHeight;
+    canvas.width = cw;
+    canvas.height = ch;
 
-  ctx.fillStyle = 'rgba(0, 0, 0, 0)';
-  ctx.fillRect(0, 0, cw, ch);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, cw, ch);
 
-  for (const system of particleSystems) {
-    system.draw(canvas);
+    for (const system of particleSystems) {
+      system.draw(canvas);
+    }
   }
-
   window.requestAnimationFrame(draw);
 }
 
 class ParticleSystem {
   constructor() {
     this.reset();
+    this.particleUpdates = [];
+    this.willEverFinish = false;
   }
 
   reset() {
+    this.resolveWhenFinished = [];
     this.particles = [];
     this.running = false;
     this.lastUpdate = Date.now();
@@ -114,48 +141,120 @@ class ParticleSystem {
   }
 
   pause() {
+    this.running = !this.running;
+  }
+
+  stop() {
     this.running = false;
+  }
+
+  async waitUntilFinished() {
+    const parent = this;
+    return new Promise((resolve) => parent.resolveWhenFinished.push(resolve));
+  }
+
+  finish() {
+    this.stop();
+    for (const resolve of this.resolveWhenFinished) {
+      resolve(true);
+    }
   }
 
   update(canvas) {
     const now = Date.now();
     const dt = (now - this.lastUpdate) / 1000;
     this.lastUpdate = now;
-    for (const particle of this.particles) {
-      this.updateParticle(particle, canvas, dt);
+    if (this.running) {
+      for (const particle of this.particles) {
+        this.updateParticle(particle, canvas, dt);
+      }
+      this.particles = this.particles.filter((particle) => particle.alive);
     }
-    this.particles = this.particles.filter((particle) => particle.alive);
     return dt;
   }
 
   draw(canvas) {
-    for (const particle of this.particles) {
-      this.drawParticle(particle, canvas);
+    if (this.running) {
+      for (const particle of this.particles) {
+        this.drawParticle(particle, canvas);
+      }
     }
   }
 
-  updateParticle(particle, canvas, dt) {}
+  updateParticle(particle, canvas, dt) {
+    ParticleUpdates.apply(particle, canvas, dt, this.particleUpdates);
+  }
 
   drawParticle(particle, canvas) {}
 }
+
+const ParticleUpdates = {
+  apply(particle, canvas, dt, updates) {
+    updates.forEach((fn) => fn(particle, canvas, dt));
+  },
+
+  move(particle, canvas, dt) {
+    const { dx, dy } = particle;
+    particle.x += dx * dt;
+    particle.y += dy * dt;
+  },
+
+  moveSineWave: ({ waveWidth, waveHeight }) => (particle, canvas, dt) => {
+    particle.x += particle.dx * dt;
+    particle.y = particle.baseY + Math.sin(particle.x / waveWidth) * waveHeight;
+  },
+
+  age(particle, canvas, dt) {
+    particle.ttl -= dt;
+    if (particle.ttl < 0) {
+      particle.alive = false;
+    }
+  },
+
+  dieOffScreen(particle, canvas, dt) {
+    const { x, y, size } = particle;
+    if (
+      x < 0 - size ||
+      x > canvas.width + size ||
+      y < 0 - size ||
+      y > canvas.height + size
+    ) {
+      particle.alive = false;
+    }
+  },
+
+  colorCycle(particle, canvas, dt) {
+    for (const name of Object.keys(particle.color)) {
+      particle.color[name] =
+        (particle.color[name] + particle.dcolor[name] * dt) % 1.0;
+    }
+  },
+};
 
 class SineScroller extends ParticleSystem {
   constructor(opts = {}) {
     super(opts);
     Object.assign(this, {
+      willEverFinish: true,
       y: 320,
       message: 'Hello world',
       speed: 250,
-      colorSpeed: 0.3,
+      color: { h: 0.0, s: 0.75, l: 0.5, a: 1.0 },
+      dcolor: { h: 0.3, s: 0, l: 0, a: 0 },
       size: 75,
       kerning: 0.75,
       waveWidth: 75,
       waveHeight: 30,
       ...opts,
     });
-    this.color = { h: 0.0, s: 0.75, l: 0.5, a: 1.0 };
-    this.dcolor = { h: this.colorSpeed, s: 0, l: 0, a: 0 };
+
     this.letters = this.message.split('');
+
+    this.particleUpdates = [
+      ParticleUpdates.moveSineWave(this),
+      ParticleUpdates.age,
+      ParticleUpdates.dieOffScreen,
+    ];
   }
 
   update(canvas) {
@@ -174,7 +273,10 @@ class SineScroller extends ParticleSystem {
         this.spawnParticle(canvas, letter);
       }
     }
-    window.particles = this.particles;
+
+    if (this.particles.length === 0) {
+      return this.finish();
+    }
   }
 
   spawnParticle(canvas, letter) {
@@ -191,21 +293,6 @@ class SineScroller extends ParticleSystem {
     });
   }
 
-  updateParticle(particle, canvas, dt) {
-    particle.x += particle.dx * dt;
-    particle.y =
-      particle.baseY + Math.sin(particle.x / this.waveWidth) * this.waveHeight;
-
-    if (particle.x < 0 - particle.size) {
-      particle.alive = false;
-    }
-
-    particle.ttl -= dt;
-    if (particle.ttl < 0) {
-      particle.alive = false;
-    }
-  }
-
   drawParticle(particle, canvas) {
     const ctx = canvas.getContext('2d');
     const { letter, x, y, rotation, size } = particle;
@@ -218,8 +305,6 @@ class SineScroller extends ParticleSystem {
     const rgba = `rgba(${r},${g},${b},1.0)`;
 
     ctx.translate(x, y);
-    // ctx.rotate(rotation);
-    // ctx.scale(size / 100, size / 100);
 
     ctx.font = `${this.size}px C64 User Mono`;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -234,6 +319,7 @@ class SineScroller extends ParticleSystem {
 class ZoomyShips extends ParticleSystem {
   constructor(opts = {}) {
     super(opts);
+
     Object.assign(this, {
       spawnDelay: 0.25,
       size: 50,
@@ -242,7 +328,15 @@ class ZoomyShips extends ParticleSystem {
       speedVary: 1000,
       ...opts,
     });
+
     this.nextParticleDelay = 0;
+
+    this.particleUpdates = [
+      ParticleUpdates.move,
+      ParticleUpdates.age,
+      ParticleUpdates.colorCycle,
+      ParticleUpdates.dieOffScreen,
+    ];
   }
 
   update(canvas) {
@@ -267,25 +361,6 @@ class ZoomyShips extends ParticleSystem {
       rotation: 90 * (Math.PI / 180),
       alive: true,
     });
-  }
-
-  updateParticle(particle, canvas, dt) {
-    particle.x += particle.dx * dt;
-    particle.y += particle.dy * dt;
-
-    if (particle.x > canvas.width + this.size) {
-      particle.alive = false;
-    }
-
-    for (const name of Object.keys(particle.color)) {
-      particle.color[name] =
-        (particle.color[name] + particle.dcolor[name] * dt) % 1.0;
-    }
-
-    particle.ttl -= dt;
-    if (particle.ttl < 0) {
-      particle.alive = false;
-    }
   }
 
   drawParticle(particle, canvas) {
